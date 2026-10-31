@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>compress</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23EDEDED' stroke-width='1.5'%3E%3Cpath d='M12 3l9 5-9 5-9-5 9-5z'/%3E%3Cpath d='M3 13l9 5 9-5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0B0B;--panel:#111;--line:#1F1F1F;--line2:#333;--text:#EDEDED;--sub:#BDBDBD;--muted:#8F8F8F;--accent:#A6F25C}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;display:flex;flex-direction:column;min-height:100vh}
+button,input{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+kbd{font-family:inherit;font-size:12px;border-radius:3px;padding:2px 6px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 24px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600}
+.meta{display:flex;align-items:center;gap:16px;color:var(--muted);font-size:12px}
+.dot{width:3px;height:3px;border-radius:50%;background:#4A4A4A}
+main{flex:1;display:flex;flex-direction:column;gap:16px;padding:16px;width:100%;max-width:1120px;margin:0 auto}
+body.empty main{max-width:none}
+.drop{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed var(--line2);border-radius:4px;padding:48px 24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop.over,.strip.over{border-color:var(--text);background:#121212}
+.drop h1{margin:40px 0 0;font-size:18px;font-weight:500}
+.drop p{margin:10px 0 0;color:var(--muted)}
+.primary{display:inline-flex;align-items:center;gap:12px;background:#fff;color:var(--bg);font-weight:500;padding:0 16px;height:44px;border-radius:4px;border:0}
+.primary kbd{background:#E6E6E6}
+.ghost{height:44px;padding:0 16px;border:1px solid var(--line2);border-radius:4px;background:transparent;color:var(--text)}
+.link{background:none;border:0;color:var(--muted);padding:8px 0}
+.link:hover{color:var(--text)}
+.drop .primary{margin-top:28px}
+.hint{margin-top:24px;color:var(--muted);font-size:12px}
+.hint kbd{background:var(--line);color:var(--sub)}
+.strip{display:flex;align-items:center;justify-content:center;gap:12px;border:1px dashed var(--line2);border-radius:4px;height:64px;color:var(--muted);cursor:pointer;flex:none}
+.strip u{color:var(--text);text-underline-offset:3px}
+.bar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 4px 0;color:var(--muted)}
+.table{overflow-x:auto;border:1px solid var(--line);border-radius:4px}
+.row{display:grid;grid-template-columns:36px minmax(0,1fr) 80px 200px 80px 56px 44px;align-items:center;column-gap:16px;padding:10px 16px;border-bottom:1px solid #1A1A1A;min-width:760px}
+.row:last-child{border-bottom:0}
+.thumb{width:36px;height:36px;border-radius:3px;background:#1A1A1A center/cover no-repeat}
+.name{display:flex;align-items:center;gap:10px;min-width:0}
+.name span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:11px;color:#A3A3A3;border:1px solid #2E2E2E;border-radius:3px;padding:1px 5px;flex:none}
+.before{color:var(--muted);text-align:right}
+.prog{height:22px;border-radius:3px;background:#1A1A1A;position:relative;overflow:hidden}
+.prog i{position:absolute;inset:0 auto 0 0;width:0;background:var(--text);transition:width .25s}
+.prog span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#A3A3A3}
+.row.run .prog span,.row.done .prog span{color:var(--bg)}
+.row.done .prog i{background:var(--accent)}
+.row.kept .prog i{background:#2A2A2A}
+.row.err .prog i{background:#3A1F1F}
+.row.err .prog span{color:#FF9B8F}
+.saved{text-align:right;font-weight:600;color:var(--muted)}
+.row.done .saved{color:var(--accent)}
+.dl{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:4px;visibility:hidden}
+.row.done .dl,.row.kept .dl{visibility:visible}
+.dl:hover{background:#1A1A1A}
+footer{display:flex;align-items:center;justify-content:space-between;gap:20px 28px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted)}
+.settings{display:flex;align-items:center;gap:16px 28px;flex-wrap:wrap}
+.group{display:flex;align-items:center;gap:10px}
+.seg{display:flex;border:1px solid #262626;border-radius:4px;overflow:hidden}
+.seg button{border:0;padding:6px 10px;background:transparent;color:var(--sub)}
+.seg button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+input[type=range]{width:120px;accent-color:var(--text)}
+input[type=checkbox]{accent-color:var(--text)}
+.check{display:flex;align-items:center;gap:8px;color:var(--sub);cursor:pointer}
+.qv{color:var(--text);min-width:24px}
+.summary{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.total{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.total b{font-size:28px;font-weight:600;color:var(--accent);letter-spacing:-.02em}
+.total span{color:var(--sub)}
+.actions{display:flex;gap:10px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
+@media (max-width:640px){
+  header,footer{padding:14px 16px}
+  .row{grid-template-columns:36px minmax(0,1fr) 64px 44px;min-width:0;row-gap:4px}
+  .row .before,.row .prog{display:none}
+  .row .after{grid-column:2;grid-row:2;font-size:11px;color:var(--muted)}
+  .row .saved{grid-column:3;grid-row:1/3}
+  .row .dl{grid-column:4;grid-row:1/3}
+  .row .thumb{grid-row:1/3}
+  .actions{width:100%}
+  .actions .primary{flex:1;justify-content:center}
+}
+</style>
+</head>
+<body class="empty">
+<header>
+  <div class="brand">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EDEDED" stroke-width="1.5" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    compress
+  </div>
+  <div class="meta"><span>No limits</span><span class="dot"></span><span>Self-hosted</span></div>
+</header>
+
+<main>
+  <input id="file" class="sr" type="file" multiple accept="image/png,image/jpeg,image/webp">
+
+  <label id="drop" class="drop" for="file">
+    <svg width="96" height="88" viewBox="0 0 96 88" fill="none" aria-hidden="true">
+      <path d="M48 4l44 22-44 22L4 26 48 4z" stroke="#6B6B6B"/>
+      <path d="M4 40l44 22 44-22" stroke="#3D3D3D"/>
+      <path d="M4 54l44 22 44-22" stroke="#2A2A2A"/>
+    </svg>
+    <h1>Drop WebP, PNG or JPEG files here</h1>
+    <p>or paste from clipboard · as many as you like</p>
+    <span class="primary">Select files <kbd class="mod">⌘O</kbd></span>
+    <span class="hint"><kbd class="mod">⌘V</kbd> to paste</span>
+  </label>
+
+  <div id="list" hidden>
+    <label id="strip" class="strip" for="file">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8F8F8F" stroke-width="1.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Drop more, or <u>select files</u>
+    </label>
+    <div class="bar" style="margin-top:16px">
+      <span id="counts" aria-live="polite"></span>
+      <button id="clear" class="link" type="button">Clear all</button>
+    </div>
+    <div class="table" id="rows" style="margin-top:8px"></div>
+  </div>
+</main>
+
+<footer>
+  <div class="settings">
+    <div class="group">
+      <span id="outLabel">Output</span>
+      <div class="seg" role="group" aria-labelledby="outLabel" id="fmt">
+        <button type="button" data-v="same" aria-pressed="true">Same</button>
+        <button type="button" data-v="webp" aria-pressed="false">WebP</button>
+        <button type="button" data-v="png" aria-pressed="false">PNG</button>
+        <button type="button" data-v="jpeg" aria-pressed="false">JPEG</button>
+      </div>
+    </div>
+    <div class="group">
+      <label for="q">Smaller</label>
+      <input id="q" type="range" min="40" max="95" value="80">
+      <span>Sharper</span>
+      <span class="qv" id="qv">80</span>
+    </div>
+    <label class="check"><input id="lossless" type="checkbox"> Lossless</label>
+  </div>
+  <div class="summary" id="summary" hidden>
+    <div class="total"><b id="pct">0%</b><span id="sizes"></span></div>
+    <div class="actions">
+      <button id="redo" class="ghost" type="button" title="Re-compress all with current settings">Re-run</button>
+      <button id="zip" class="primary" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B0B0B" stroke-width="1.5" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        Download all (.zip)
+      </button>
+    </div>
+  </div>
+</footer>
+
+<template id="rowTpl">
+  <div class="row queued">
+    <div class="thumb"></div>
+    <div class="name"><span></span><span class="tag"></span></div>
+    <span class="before"></span>
+    <div class="prog"><i></i><span>Queued</span></div>
+    <span class="after">—</span>
+    <span class="saved"></span>
+    <button class="dl" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EDEDED" stroke-width="1.5" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
+  </div>
+</template>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const ACCEPT = ['image/png', 'image/jpeg', 'image/webp'];
+  const CONCURRENCY = Math.min(Math.max(navigator.hardwareConcurrency || 4, 2), 8);
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+  if (!isMac) document.querySelectorAll('kbd.mod').forEach((k) => (k.textContent = k.textContent.replace('⌘', 'Ctrl+')));
+
+  const settings = { format: 'same', quality: 80, lossless: false };
+  const items = [];
+  const queue = [];
+  let running = 0;
+  let seq = 0;
+
+  // ---------- helpers ----------
+  const fmtBytes = (n) => {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  };
+  const extOf = (name) => (name.match(/\.([^.]+)$/) || [])[1] || '';
+  const baseOf = (name) => name.replace(/\.[^.]+$/, '');
+  const typeTag = (t) => ({ 'image/png': 'PNG', 'image/jpeg': 'JPEG', 'image/webp': 'WEBP' })[t] || '?';
+
+  // ---------- adding files ----------
+  function add(files) {
+    let added = 0;
+    for (const f of files) {
+      if (!ACCEPT.includes(f.type)) continue;
+      const name = f.name && f.name !== 'image.png' ? f.name : `pasted-${Date.now()}-${++seq}.${f.type.split('/')[1].replace('jpeg', 'jpg')}`;
+      const it = { id: ++seq, file: f, name, state: 'queued', out: null, outName: '', thumb: URL.createObjectURL(f) };
+      it.el = render(it);
+      items.push(it);
+      queue.push(it);
+      added++;
+    }
+    if (added) {
+      document.body.classList.remove('empty');
+      $('#drop').hidden = true;
+      $('#list').hidden = false;
+      update();
+      pump();
+    }
+  }
+
+  function render(it) {
+    const el = $('#rowTpl').content.firstElementChild.cloneNode(true);
+    el.querySelector('.thumb').style.backgroundImage = `url("${it.thumb}")`;
+    el.querySelector('.name span').textContent = it.name;
+    el.querySelector('.name span').title = it.name;
+    el.querySelector('.tag').textContent = typeTag(it.file.type);
+    el.querySelector('.before').textContent = fmtBytes(it.file.size);
+    const dl = el.querySelector('.dl');
+    dl.setAttribute('aria-label', 'Download ' + it.name);
+    dl.onclick = () => it.out && save(it.out, it.outName);
+    $('#rows').appendChild(el);
+    return el;
+  }
+
+  function setRow(it, state, label, pct) {
+    it.state = state;
+    const el = it.el;
+    el.className = 'row ' + state;
+    el.querySelector('.prog span').textContent = label;
+    el.querySelector('.prog i').style.width = pct + '%';
+    if (it.out) {
+      el.querySelector('.after').textContent = fmtBytes(it.out.size);
+      const s = Math.round((1 - it.out.size / it.file.size) * 100);
+      el.querySelector('.saved').textContent = s > 0 ? '−' + s + '%' : s === 0 ? '0%' : '+' + -s + '%';
+    } else {
+      el.querySelector('.after').textContent = '—';
+      el.querySelector('.saved').textContent = '';
+    }
+  }
+
+  // ---------- queue ----------
+  function pump() {
+    while (running < CONCURRENCY && queue.length) {
+      const it = queue.shift();
+      if (it.removed) continue;
+      running++;
+      run(it).finally(() => { running--; update(); pump(); });
+    }
+  }
+
+  function run(it) {
+    return new Promise((resolve) => {
+      const q = new URLSearchParams({ format: settings.format, quality: settings.quality, lossless: settings.lossless });
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/compress?' + q);
+      xhr.responseType = 'blob';
+      setRow(it, 'run', 'Uploading 0%', 2);
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const p = Math.round((e.loaded / e.total) * 100);
+        setRow(it, 'run', p < 100 ? `Uploading ${p}%` : 'Compressing…', Math.max(2, p * 0.5));
+      };
+      xhr.upload.onload = () => setRow(it, 'run', 'Compressing…', 60);
+      xhr.onload = async () => {
+        if (xhr.status !== 200) {
+          const msg = xhr.response ? await xhr.response.text() : 'Failed';
+          setRow(it, 'err', msg.slice(0, 40) || 'Failed', 100);
+          it.el.querySelector('.prog span').title = msg;
+          return resolve();
+        }
+        it.out = xhr.response;
+        const ext = xhr.getResponseHeader('x-output-ext') || extOf(it.name);
+        const sameExt = ext === extOf(it.name).toLowerCase() || (ext === 'jpg' && /^jpe?g$/i.test(extOf(it.name)));
+        it.outName = sameExt ? it.name : baseOf(it.name) + '.' + ext;
+        if (xhr.getResponseHeader('x-kept-original') === '1') setRow(it, 'kept', 'Already optimal — kept', 100);
+        else setRow(it, 'done', 'Finished', 100);
+        resolve();
+      };
+      xhr.onerror = () => { setRow(it, 'err', 'Network error', 100); resolve(); };
+      xhr.send(it.file);
+    });
+  }
+
+  function update() {
+    const n = items.length;
+    const by = (s) => items.filter((i) => i.state === s).length;
+    const done = by('done') + by('kept');
+    const parts = [`${n} file${n === 1 ? '' : 's'}`, `${done} done`];
+    if (by('run')) parts.push(`${by('run')} compressing`);
+    if (by('queued')) parts.push(`${by('queued')} queued`);
+    if (by('err')) parts.push(`${by('err')} failed`);
+    $('#counts').textContent = parts.join(' · ');
+
+    const finished = items.filter((i) => i.out);
+    $('#summary').hidden = !finished.length;
+    if (finished.length) {
+      const a = finished.reduce((s, i) => s + i.file.size, 0);
+      const b = finished.reduce((s, i) => s + i.out.size, 0);
+      $('#pct').textContent = '−' + Math.max(0, Math.round((1 - b / a) * 100)) + '%';
+      $('#sizes').textContent = `${fmtBytes(a)} → ${fmtBytes(b)} · ${fmtBytes(Math.max(0, a - b))} saved`;
+    }
+  }
+
+  // ---------- downloads ----------
+  function save(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  }
+
+  // Minimal store-only ZIP writer (images are already compressed).
+  const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc32 = (buf) => { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+
+  async function zip(entries) {
+    const enc = new TextEncoder();
+    const chunks = [], central = [];
+    let offset = 0;
+    const d = new Date();
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    for (const { name, blob } of entries) {
+      const data = new Uint8Array(await blob.arrayBuffer());
+      const fn = enc.encode(name);
+      const crc = crc32(data);
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
+      lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, fn.length, true);
+      chunks.push(lh, fn, data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+      ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, fn.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(ch, fn);
+      offset += 30 + fn.length + data.length;
+    }
+    const size = central.reduce((s, c) => s + c.byteLength, 0);
+    const end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+    end.setUint32(12, size, true); end.setUint32(16, offset, true);
+    return new Blob([...chunks, ...central, end], { type: 'application/zip' });
+  }
+
+  $('#zip').onclick = async () => {
+    const used = new Set();
+    const entries = items.filter((i) => i.out).map((i) => {
+      let n = i.outName, k = 1;
+      while (used.has(n)) n = `${baseOf(i.outName)} (${k++}).${extOf(i.outName)}`;
+      used.add(n);
+      return { name: n, blob: i.out };
+    });
+    if (!entries.length) return;
+    const btn = $('#zip');
+    btn.disabled = true;
+    try { save(await zip(entries), `compressed-${new Date().toISOString().slice(0, 10)}.zip`); }
+    finally { btn.disabled = false; }
+  };
+
+  $('#redo').onclick = () => {
+    for (const it of items) {
+      if (it.state === 'run' || it.state === 'queued') continue;
+      it.out = null;
+      setRow(it, 'queued', 'Queued', 0);
+      queue.push(it);
+    }
+    update();
+    pump();
+  };
+
+  $('#clear').onclick = () => {
+    for (const it of items) { it.removed = true; URL.revokeObjectURL(it.thumb); }
+    items.length = 0; queue.length = 0;
+    $('#rows').innerHTML = '';
+    document.body.classList.add('empty');
+    $('#drop').hidden = false;
+    $('#list').hidden = true;
+    update();
+  };
+
+  // ---------- inputs ----------
+  $('#file').onchange = (e) => { add(e.target.files); e.target.value = ''; };
+
+  let depth = 0;
+  const zones = () => [$('#drop'), $('#strip')];
+  window.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; zones().forEach((z) => z.classList.add('over')); });
+  window.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; zones().forEach((z) => z.classList.remove('over')); } });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault(); depth = 0;
+    zones().forEach((z) => z.classList.remove('over'));
+    add(e.dataTransfer.files);
+  });
+  window.addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData?.items || [])].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
+    add(files);
+  });
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); $('#file').click(); }
+  });
+
+  // ---------- settings ----------
+  try { Object.assign(settings, JSON.parse(localStorage.getItem('compress.settings') || '{}')); } catch {}
+  const persist = () => localStorage.setItem('compress.settings', JSON.stringify(settings));
+  const syncUI = () => {
+    document.querySelectorAll('#fmt button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === settings.format)));
+    $('#q').value = settings.quality; $('#qv').textContent = settings.quality;
+    $('#lossless').checked = settings.lossless;
+    $('#q').disabled = settings.lossless;
+  };
+  document.querySelectorAll('#fmt button').forEach((b) => (b.onclick = () => { settings.format = b.dataset.v; persist(); syncUI(); }));
+  $('#q').oninput = (e) => { settings.quality = +e.target.value; persist(); syncUI(); };
+  $('#lossless').onchange = (e) => { settings.lossless = e.target.checked; persist(); syncUI(); };
+  syncUI();
+})();
+</script>
+</body>
+</html>
