@@ -5,6 +5,8 @@ It's one small app with no account, no upload quota, and no limit on file count 
 
 Drop files, paste from the clipboard or pick a folder's worth of images, then download them one by one or all at once as a `.zip`.
 
+It's also an **HTTP API**: your own app can send an image and get the compressed file back before it uploads to storage. See [docs/API.md](docs/API.md), which has examples for cURL, browser JS, Node.js, Laravel/PHP, Python and Go.
+
 ## Download and run
 
 Get the archive for your system from the [latest release](https://github.com/haloabdur/compress-img/releases/latest):
@@ -84,7 +86,7 @@ cargo run --release
 
 ```bash
 docker build -t compress .
-docker run -p 8080:8080 compress
+docker run -p 8080:8080 -e API_KEY=change-me compress
 ```
 
 ### Options
@@ -96,24 +98,35 @@ compress-img [--no-browser] [--version] [--help]
 | Environment variable | Default | |
 |---|---|---|
 | `BIND` | `127.0.0.1:8080` | Listen address. Use `0.0.0.0:8080` to use it from other devices on your network |
+| `API_KEY` | unset | When set, `/api/compress` requires `Authorization: Bearer <key>` or `X-API-Key: <key>` (the web UI asks for it once) |
+| `CORS_ORIGINS` | `*` | Comma-separated origins allowed to call the API from a browser |
 | `MAX_UPLOAD_MB` | `200` | Largest single file accepted |
 | `WORKERS` | CPU cores | Images compressed at the same time |
 | `NO_BROWSER` | unset | Set to anything to skip opening the browser |
 
 ## HTTP API
 
+Full documentation in Indonesian: **[docs/API.md](docs/API.md)**
+
 ```bash
-curl --data-binary @photo.jpg \
-  "http://127.0.0.1:8080/api/compress?format=same&quality=80" -o photo.min.jpg
+# Form upload: compress, convert to WebP, fit within 1920 px wide
+curl -H "X-API-Key: $API_KEY" -F "file=@photo.jpg" -F format=webp -F max_width=1920 \
+  http://127.0.0.1:8080/api/compress -o photo.webp
+
+# Raw body
+curl --data-binary @photo.jpg "http://127.0.0.1:8080/api/compress?quality=80" -o photo.min.jpg
 ```
 
-| Query | Values |
+| Option (query or form field) | Values |
 |---|---|
 | `format` | `same` (default), `png`, `jpeg`, `webp` |
 | `quality` | `1`–`100`, default `80` |
 | `lossless` | `true` / `false` |
+| `max_width`, `max_height` | Downscale to fit, keeping aspect ratio (never upscales) |
+| `filename` | Name used in `Content-Disposition` (extension adjusted to the output) |
+| `response` | `binary` (default) or `json` (base64 + stats) |
 
-The response body is the compressed image. Headers: `x-original-size`, `x-output-ext`, `x-kept-original` (`1` when the original was returned).
+The response body is the compressed image. Headers: `Content-Disposition`, `X-Original-Size`, `X-Compressed-Size`, `X-Saved-Percent`, `X-Output-Ext`, `X-Kept-Original`, `X-Width`, `X-Height`. Errors are JSON: `{"error": "..."}`. `GET /api/health` reports status and whether a key is required.
 
 ## Releasing
 

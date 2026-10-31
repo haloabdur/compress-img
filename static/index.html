@@ -179,6 +179,7 @@ input[type=checkbox]{accent-color:var(--text)}
   const settings = { format: 'same', quality: 80, lossless: false };
   const items = [];
   const queue = [];
+  const askedFor = new Set(); // API keys we already prompted to replace
   let running = 0;
   let seq = 0;
 
@@ -259,6 +260,8 @@ input[type=checkbox]{accent-color:var(--text)}
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/compress?' + q);
       xhr.responseType = 'blob';
+      const key = localStorage.getItem('compress.apiKey');
+      if (key) xhr.setRequestHeader('X-API-Key', key);
       setRow(it, 'run', 'Uploading 0%', 2);
       xhr.upload.onprogress = (e) => {
         if (!e.lengthComputable) return;
@@ -267,8 +270,20 @@ input[type=checkbox]{accent-color:var(--text)}
       };
       xhr.upload.onload = () => setRow(it, 'run', 'Compressing…', 60);
       xhr.onload = async () => {
+        if (xhr.status === 401) {
+          // Ask once even when several uploads get rejected at the same time:
+          // only re-prompt if nobody has replaced the key this request used.
+          if ((localStorage.getItem('compress.apiKey') || null) === (key || null) && !askedFor.has(key || '')) {
+            askedFor.add(key || '');
+            const k = prompt('This server requires an API key:');
+            if (k) localStorage.setItem('compress.apiKey', k.trim());
+          }
+          const now = localStorage.getItem('compress.apiKey');
+          if (now && now !== key) return run(it).then(resolve);
+        }
         if (xhr.status !== 200) {
-          const msg = xhr.response ? await xhr.response.text() : 'Failed';
+          let msg = xhr.response ? await xhr.response.text() : 'Failed';
+          try { msg = JSON.parse(msg).error || msg; } catch {}
           setRow(it, 'err', msg.slice(0, 40) || 'Failed', 100);
           it.el.querySelector('.prog span').title = msg;
           return resolve();

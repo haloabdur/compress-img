@@ -50,6 +50,9 @@ pub struct Options {
     /// 1..=100
     pub quality: u8,
     pub lossless: bool,
+    /// Downscale (never upscale) to fit inside these bounds, keeping aspect ratio.
+    pub max_width: Option<u32>,
+    pub max_height: Option<u32>,
 }
 
 pub struct Output {
@@ -57,6 +60,8 @@ pub struct Output {
     pub format: Format,
     /// True when the original was returned because re-encoding made it bigger.
     pub kept_original: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 pub fn detect(data: &[u8]) -> Option<Format> {
@@ -73,35 +78,55 @@ pub fn compress(input: &[u8], opts: Options) -> Result<Output, String> {
     let out_fmt = opts.output.unwrap_or(in_fmt);
     let quality = opts.quality.clamp(1, 100);
 
+    let mut img = decode(input)?;
+    let (orig_w, orig_h) = (img.width(), img.height());
+    let resized = fit(&mut img, opts.max_width, opts.max_height);
+    let (w, h) = (img.width(), img.height());
+
     let data = match out_fmt {
         Format::Png => {
-            if opts.lossless && in_fmt == Format::Png {
+            if opts.lossless && in_fmt == Format::Png && !resized {
                 optimize_png(input, 3)?
+            } else if opts.lossless {
+                optimize_png(&encode_png_rgba(&img.to_rgba8())?, 3)?
             } else {
-                let img = decode(input)?;
-                if opts.lossless {
-                    optimize_png(&encode_png_rgba(&img.to_rgba8())?, 3)?
-                } else {
-                    quantize_png(&img.to_rgba8(), quality)?
-                }
+                quantize_png(&img.to_rgba8(), quality)?
             }
         }
         Format::Jpeg => {
-            let img = decode(input)?;
             // JPEG has no lossless mode here; "lossless" means near-visually-lossless.
             let q = if opts.lossless { quality.max(95) } else { jpeg_target(quality) };
             encode_jpeg(&img, q)?
         }
-        Format::Webp => {
-            let img = decode(input)?;
-            encode_webp(&img.to_rgba8(), quality, opts.lossless)?
-        }
+        Format::Webp => encode_webp(&img.to_rgba8(), quality, opts.lossless)?,
     };
 
-    if out_fmt == in_fmt && data.len() >= input.len() {
-        return Ok(Output { data: input.to_vec(), format: in_fmt, kept_original: true });
+    // Returning the original is only valid when it has the requested size.
+    if out_fmt == in_fmt && !resized && data.len() >= input.len() {
+        return Ok(Output {
+            data: input.to_vec(),
+            format: in_fmt,
+            kept_original: true,
+            width: orig_w,
+            height: orig_h,
+        });
     }
-    Ok(Output { data, format: out_fmt, kept_original: false })
+    Ok(Output { data, format: out_fmt, kept_original: false, width: w, height: h })
+}
+
+/// Shrinks `img` to fit inside the given bounds. Returns true if it changed.
+fn fit(img: &mut DynamicImage, max_w: Option<u32>, max_h: Option<u32>) -> bool {
+    let (w, h) = (img.width(), img.height());
+    let mw = max_w.filter(|&v| v > 0).unwrap_or(u32::MAX);
+    let mh = max_h.filter(|&v| v > 0).unwrap_or(u32::MAX);
+    if w <= mw && h <= mh {
+        return false;
+    }
+    let scale = (mw as f64 / w as f64).min(mh as f64 / h as f64);
+    let nw = ((w as f64 * scale).round() as u32).max(1);
+    let nh = ((h as f64 * scale).round() as u32).max(1);
+    *img = img.resize_exact(nw, nh, image::imageops::FilterType::Lanczos3);
+    true
 }
 
 fn decode(input: &[u8]) -> Result<DynamicImage, String> {
