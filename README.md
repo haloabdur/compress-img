@@ -117,11 +117,7 @@ The response body is the compressed image. Headers: `x-original-size`, `x-output
 
 ## Releasing
 
-Push a version tag. GitHub Actions builds every platform and publishes the release:
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0
-```
+Bump `version` in `Cargo.toml` and push to `main`. GitHub Actions builds Windows, macOS and Linux, creates the `v<version>` tag and publishes the release. Pushes that don't change the version skip the release.
 
 ## License
 
