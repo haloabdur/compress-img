@@ -2,6 +2,14 @@
 name = "compress-img"
 version = "0.1.0"
 edition = "2024"
+description = "Self-hosted batch image compressor for PNG, JPEG and WebP"
+license = "MIT"
+repository = "https://github.com/haloabdur/compress-img"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
 
 [dependencies]
 axum = "0.8.9"
@@ -9,6 +17,7 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 imagequant = "4.4.1"
 mozjpeg = "0.10.13"
 num_cpus = "1.17.0"
+open = "5.4.5"
 oxipng = "10.2.1"
 png = "0.18.1"
 serde = { version = "1.0.229", features = ["derive"] }

@@ -40,10 +40,18 @@ async fn main() {
         )
         .init();
 
-    let addr: SocketAddr = std::env::var("BIND")
-        .unwrap_or_else(|_| "127.0.0.1:8080".into())
-        .parse()
-        .expect("BIND must look like 127.0.0.1:8080");
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "-V" || a == "--version") {
+        println!("compress-img {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        println!("{HELP}");
+        return;
+    }
+    let no_browser = args.iter().any(|a| a == "--no-browser") || std::env::var_os("NO_BROWSER").is_some();
+    let explicit_bind = std::env::var("BIND").ok();
+
     let max_mb: usize = std::env::var("MAX_UPLOAD_MB")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -61,9 +69,51 @@ async fn main() {
         .layer(DefaultBodyLimit::max(max_mb * 1024 * 1024))
         .with_state(state);
 
-    tracing::info!("compress listening on http://{addr} ({workers} workers, {max_mb} MB max upload)");
-    let listener = tokio::net::TcpListener::bind(addr).await.expect("bind failed");
-    axum::serve(listener, app).await.expect("server error");
+    let listener = bind(explicit_bind.as_deref()).await;
+    let addr = listener.local_addr().expect("local addr");
+    let url = if addr.ip().is_unspecified() {
+        format!("http://127.0.0.1:{}", addr.port())
+    } else {
+        format!("http://{addr}")
+    };
+    println!();
+    println!("  compress {} is running at {url}", env!("CARGO_PKG_VERSION"));
+    println!("  {workers} workers · {max_mb} MB max per file · close this window or press Ctrl+C to stop");
+    println!();
+    if !no_browser {
+        let _ = open::that_detached(&url);
+    }
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async { let _ = tokio::signal::ctrl_c().await; })
+        .await
+        .expect("server error");
+}
+
+const HELP: &str = "compress-img: batch PNG / JPEG / WebP compressor with a web UI
+
+USAGE: compress-img [--no-browser] [--version]
+
+ENVIRONMENT:
+  BIND=127.0.0.1:8080   listen address (0.0.0.0:8080 to share on your network)
+  MAX_UPLOAD_MB=200     largest single file accepted
+  WORKERS=<cores>       images compressed at the same time
+  NO_BROWSER=1          don't open the browser on start";
+
+/// Binds the explicit address, or 127.0.0.1:8080 falling back to the next
+/// free port so a double-clicked app never fails just because 8080 is busy.
+async fn bind(explicit: Option<&str>) -> tokio::net::TcpListener {
+    if let Some(a) = explicit {
+        let addr: SocketAddr = a.parse().expect("BIND must look like 127.0.0.1:8080");
+        return tokio::net::TcpListener::bind(addr)
+            .await
+            .unwrap_or_else(|e| panic!("cannot listen on {addr}: {e}"));
+    }
+    for port in (8080..8100).chain(std::iter::once(0)) {
+        if let Ok(l) = tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+            return l;
+        }
+    }
+    panic!("no free port found");
 }
 
 async fn compress_handler(

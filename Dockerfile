@@ -6,6 +6,6 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 COPY --from=build /app/target/release/compress-img /usr/local/bin/compress-img
-ENV BIND=0.0.0.0:8080
+ENV BIND=0.0.0.0:8080 NO_BROWSER=1
 EXPOSE 8080
 CMD ["compress-img"]

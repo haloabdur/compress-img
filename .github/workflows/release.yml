@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x64, exe: compress-img.exe }
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64, exe: compress-img }
+          - { os: macos-latest, target: x86_64-apple-darwin, name: macos-x64, exe: compress-img }
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, name: linux-x64, exe: compress-img }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, name: linux-arm64, exe: compress-img }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: ilammy/setup-nasm@v1
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -e
+          dir="compress-img-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir "$dir"
+          cp "target/${{ matrix.target }}/release/${{ matrix.exe }}" "$dir/"
+          cp README.md LICENSE THIRD-PARTY-NOTICES.md "$dir/"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "$dir.zip" "$dir" >/dev/null
+          else
+            tar czf "$dir.tar.gz" "$dir"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: compress-img-*.*
+
+  release:
+    needs: build
+    if: always() && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: compress-img-*.*
+          generate_release_notes: true
