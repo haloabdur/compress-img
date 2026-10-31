@@ -89,7 +89,7 @@ pub fn compress(input: &[u8], opts: Options) -> Result<Output, String> {
         Format::Jpeg => {
             let img = decode(input)?;
             // JPEG has no lossless mode here; "lossless" means near-visually-lossless.
-            let q = if opts.lossless { quality.max(95) } else { quality };
+            let q = if opts.lossless { quality.max(95) } else { jpeg_target(quality) };
             encode_jpeg(&img, q)?
         }
         Format::Webp => {
@@ -162,7 +162,31 @@ fn quantize_png(img: &RgbaImage, quality: u8) -> Result<Vec<u8>, String> {
     }
     // Deeper deflate search on normal-sized images; lighter on huge ones.
     let preset = if (w as u64) * (h as u64) <= 4_000_000 { 2 } else { 1 };
-    optimize_png(&buf, preset)
+    let out = optimize_png(&buf, preset)?;
+    // Screenshots and graphics usually end up small: a Zopfli pass shaves
+    // another ~10-15% there for a few seconds of CPU. On big photo-like
+    // PNGs it gains <1% at 5-8x the time, so skip it.
+    if out.len() <= ZOPFLI_MAX_BYTES && (w as u64) * (h as u64) <= 3_000_000 {
+        if let Ok(z) = optimize_png_zopfli(&out) {
+            if z.len() < out.len() {
+                return Ok(z);
+            }
+        }
+    }
+    Ok(out)
+}
+
+const ZOPFLI_MAX_BYTES: usize = 400_000;
+
+fn optimize_png_zopfli(data: &[u8]) -> Result<Vec<u8>, String> {
+    let mut o = oxipng::Options::from_preset(2);
+    o.strip = oxipng::StripChunks::Safe;
+    o.optimize_alpha = true;
+    o.deflater = oxipng::Deflater::Zopfli(oxipng::ZopfliOptions {
+        iteration_count: std::num::NonZeroU64::new(5).unwrap(),
+        ..Default::default()
+    });
+    oxipng::optimize_from_memory(data, &o).map_err(|e| e.to_string())
 }
 
 fn encode_png_rgba(img: &RgbaImage) -> Result<Vec<u8>, String> {
@@ -248,6 +272,13 @@ fn encode_webp(img: &RgbaImage, quality: u8, lossless: bool) -> Result<Vec<u8>, 
         .encode_advanced(&cfg)
         .map_err(|e| format!("WebP encoder failed: {e:?}"))?;
     Ok(mem.to_vec())
+}
+
+/// Maps the UI quality to mozjpeg quality. TinyJPG output lands between
+/// mozjpeg q70 and q80 in published comparisons (~q72-75), so the UI default
+/// of 80 encodes at q75, mozjpeg's own default.
+fn jpeg_target(quality: u8) -> u8 {
+    quality.saturating_sub(5).max(1)
 }
 
 /// Maps the UI quality (40..=95) to libimagequant's target quality.

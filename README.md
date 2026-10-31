@@ -33,7 +33,7 @@ If port 8080 is busy, the app picks the next free port and prints the address.
 |---|---|
 | Add files | Drag and drop anywhere, ⌘V / Ctrl+V to paste, ⌘O / Ctrl+O to pick |
 | **Output** | *Same* keeps each file's format, or convert everything to WebP, PNG or JPEG |
-| **Smaller ↔ Sharper** | Quality, default 80 |
+| **Smaller ↔ Sharper** | Quality, default 80 (JPEG encodes at slider − 5, so q75 by default) |
 | **Lossless** | PNG: re-optimized without changing a pixel. WebP: lossless mode. JPEG: quality ≥ 95 (JPEG has no true lossless re-encode here) |
 | **Re-run** | Re-compress everything already in the list with the current settings |
 | **Download all** | Every result in one `.zip` |
@@ -44,22 +44,22 @@ Settings are remembered between visits.
 
 | Format | Engine | Technique |
 |---|---|---|
-| PNG  | [libimagequant](https://github.com/ImageOptim/libimagequant) + [oxipng](https://github.com/shssoichiro/oxipng) | Lossy reduction to a 256-colour palette with light dithering (the pngquant technique that TinyPNG popularised), then lossless deflate re-optimization |
-| JPEG | [mozjpeg](https://github.com/mozilla/mozjpeg) | Trellis quantization, progressive scans, optimized Huffman tables; 4:4:4 chroma at quality ≥ 90 |
+| PNG  | [libimagequant](https://github.com/ImageOptim/libimagequant) + [oxipng](https://github.com/shssoichiro/oxipng) | Lossy reduction to a 256-colour palette with light dithering (the pngquant technique TinyPNG is built on), then lossless deflate re-optimization, plus a Zopfli pass for screenshots and graphics |
+| JPEG | [mozjpeg](https://github.com/mozilla/mozjpeg) | Trellis quantization, progressive scans, optimized Huffman tables. The default setting encodes at mozjpeg q75, close to where TinyJPG output lands (≈ q72–75 in published comparisons); 4:4:4 chroma at quality ≥ 90 |
 | WebP | [libwebp](https://chromium.googlesource.com/webm/libwebp) | Method 6 (slowest, smallest), sharp RGB→YUV, compressed alpha |
 
 - EXIF orientation is applied to the pixels, then all metadata (EXIF, GPS, comments) is stripped, so phone photos never end up rotated.
 - If re-encoding to the same format wouldn't make the file smaller, the original is returned untouched ("Already optimal — kept").
 - Several files upload at once, and the server compresses one image per CPU core.
 
-### Measured results (default settings, quality 80)
+### Measured results (default settings)
 
 | File | Original | Same format | → WebP |
 |---|---|---|---|
-| Lake photo, 4000×2250 JPEG | 1.8 MB | **−69%** (0.7 s) | −75% |
-| Same photo saved at JPEG q95 | 2.4 MB | **−75%** | −78% |
+| Lake photo, 4000×2250 JPEG | 1.8 MB | **−77%** (0.6 s) | −75% |
+| Same photo saved at JPEG q95 | 2.4 MB | **−82%** | −78% |
 | Same photo saved as PNG | 8.2 MB | −46% | **−95%** |
-| UI screenshot PNG with transparency | 11 KB | **−61%** | — |
+| UI screenshot PNG with transparency | 11 KB | **−67%** | — |
 
 PNG is the wrong format for photos. Convert those to WebP or JPEG for much smaller files.
 
@@ -70,7 +70,7 @@ PNG is the wrong format for photos. Convert those to WebP or JPEG for much small
 3. Drop the same originals into compress with **Output: Same** and the default quality, then *Download all*.
 4. Compare file sizes, then open matching pairs side by side at 100% zoom.
 
-If compress comes out larger on some kind of image, move the slider toward *Smaller* (try 70–75 for JPEG). Please open an issue with the numbers.
+If compress comes out larger on some kind of image, move the slider toward *Smaller*. Please open an issue with the numbers.
 
 ## Run from source
 
